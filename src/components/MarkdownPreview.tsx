@@ -14,6 +14,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ html, wrapCode
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        minHeight: 0,
         backgroundColor: 'var(--bg-app)',
         overflow: 'hidden',
         position: 'relative'
@@ -26,7 +27,8 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ html, wrapCode
         padding: '8px 16px',
         borderBottom: '1px solid var(--border-subtle)',
         backgroundColor: 'var(--bg-surface)',
-        fontSize: '12px'
+        fontSize: '12px',
+        flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
           <Eye size={14} color="var(--crimson-600)" />
@@ -46,20 +48,27 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ html, wrapCode
         </div>
       </div>
 
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '24px',
-        display: 'flex',
-        justifyContent: 'center'
-      }}>
+      <div
+        className="preview-scroll-container"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: '24px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'flex-start'
+        }}
+      >
         <div style={{
           maxWidth: '860px',
           width: '100%',
           boxShadow: 'var(--shadow-md)',
           borderRadius: '8px',
           overflow: 'hidden',
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          marginBottom: '32px'
         }}>
           {html ? (
             <div

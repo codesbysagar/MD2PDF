@@ -239,11 +239,11 @@ export function App() {
       <ProgressBar state={generationState} />
 
       {/* 4. Main Body Layout */}
-      <main style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+      <main style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {/* Split View */}
         {activeTab === 'split' && (
           <>
-            <div style={{ flex: 1, minWidth: '320px', height: '100%' }}>
+            <div style={{ flex: 1, minWidth: '320px', height: '100%', minHeight: 0, overflow: 'hidden' }}>
               <MarkdownEditor
                 value={markdown}
                 onChange={setMarkdown}
@@ -255,7 +255,7 @@ export function App() {
                 onTriggerGenerate={handleGeneratePdf}
               />
             </div>
-            <div style={{ flex: 1, minWidth: '320px', height: '100%' }}>
+            <div style={{ flex: 1, minWidth: '320px', height: '100%', minHeight: 0, overflow: 'hidden' }}>
               <MarkdownPreview
                 html={renderedHtml}
                 wrapCode={config.wrapCode}
@@ -266,7 +266,7 @@ export function App() {
 
         {/* Editor Only View */}
         {activeTab === 'editor' && (
-          <div style={{ flex: 1, height: '100%' }}>
+          <div style={{ flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
             <MarkdownEditor
               value={markdown}
               onChange={setMarkdown}
@@ -282,7 +282,7 @@ export function App() {
 
         {/* HTML Live Preview View */}
         {activeTab === 'preview' && (
-          <div style={{ flex: 1, height: '100%' }}>
+          <div style={{ flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
             <MarkdownPreview
               html={renderedHtml}
               wrapCode={config.wrapCode}
@@ -292,7 +292,7 @@ export function App() {
 
         {/* PDF Preview View */}
         {activeTab === 'pdf' && (
-          <div style={{ flex: 1, height: '100%' }}>
+          <div style={{ flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
             <PdfPreview
               pdfBlobUrl={generationState.pdfBlobUrl}
               pageCount={generationState.pageCount}

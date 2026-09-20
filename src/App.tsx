@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { Header } from './components/Header';
-import { Toolbar } from './components/Toolbar';
+import { VerticalToolbox } from './components/VerticalToolbox';
 import { ProgressBar } from './components/ProgressBar';
 import { MarkdownEditor } from './components/MarkdownEditor';
 import { MarkdownPreview } from './components/MarkdownPreview';
@@ -222,24 +222,24 @@ export function App() {
         isTyping={isTyping}
       />
 
-      {/* 2. Main Toolbar */}
-      <Toolbar
-        config={config}
-        onChangeConfig={(patch) => setConfig((prev) => ({ ...prev, ...patch }))}
-        onGeneratePdf={handleGeneratePdf}
-        onPrint={handlePrint}
-        onDownload={handleDownload}
-        isGenerating={generationState.step !== 'idle' && generationState.step !== 'ready' && generationState.step !== 'error'}
-        hasPdf={Boolean(generationState.pdfBlobUrl)}
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-      />
-
-      {/* 3. Progress Bar with Crimson Glow & Shimmer */}
+      {/* 2. Progress Bar with Crimson Glow & Shimmer */}
       <ProgressBar state={generationState} />
 
-      {/* 4. Main Body Layout */}
+      {/* 3. Main Body Layout with Left-Side Vertical Toolbox */}
       <main style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        {/* Modern Vertical Toolbox */}
+        <VerticalToolbox
+          config={config}
+          onChangeConfig={(patch) => setConfig((prev) => ({ ...prev, ...patch }))}
+          onGeneratePdf={handleGeneratePdf}
+          onPrint={handlePrint}
+          onDownload={handleDownload}
+          isGenerating={generationState.step !== 'idle' && generationState.step !== 'ready' && generationState.step !== 'error'}
+          hasPdf={Boolean(generationState.pdfBlobUrl)}
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+        />
+
         {/* Split View */}
         {activeTab === 'split' && (
           <>

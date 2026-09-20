@@ -1,0 +1,72 @@
+@media print {
+  /* Suppress UI Chrome */
+  header,
+  .toolbar-container,
+  .editor-container,
+  .tab-bar,
+  .generation-status-banner,
+  .stats-bar,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .app-container {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .preview-wrapper {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .markdown-body {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Page breaks */
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .markdown-body pre,
+  .markdown-body blockquote,
+  .markdown-body table,
+  .markdown-body figure {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .markdown-body table thead {
+    display: table-header-group;
+  }
+
+  .markdown-body tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  p, li {
+    orphans: 2;
+    widows: 2;
+  }
+}

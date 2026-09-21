@@ -8,15 +8,13 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onSelectSample: (sample: MarkdownSample) => void;
   onOpenHelp: () => void;
-  isTyping: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   theme,
   onToggleTheme,
   onSelectSample,
-  onOpenHelp,
-  isTyping
+  onOpenHelp
 }) => {
   return (
     <header style={{
@@ -32,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
       gap: '16px',
       flexWrap: 'wrap'
     }}>
-      {/* Brand & Live Activity Dot */}
+      {/* Brand & Title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{
           width: '38px',
@@ -51,47 +49,15 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h1 style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-              color: 'var(--text-primary)',
-              margin: 0
-            }}>
-              MD<span style={{ color: 'var(--crimson-600)' }}>2</span>PDF
-            </h1>
-
-            {/* Continuous Pulse Activity Indicator */}
-            <div
-              title={isTyping ? 'Syncing edits in browser...' : 'Client-side ready'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '2px 8px',
-                borderRadius: '12px',
-                fontSize: '11px',
-                fontWeight: 500,
-                backgroundColor: isTyping ? 'var(--crimson-50)' : 'var(--bg-surface-hover)',
-                color: isTyping ? 'var(--crimson-700)' : 'var(--text-secondary)',
-                border: `1px solid ${isTyping ? 'var(--crimson-200)' : 'var(--border-subtle)'}`,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: isTyping ? 'var(--crimson-600)' : '#10b981',
-                  display: 'inline-block'
-                }}
-                className={isTyping ? 'animate-live-dot' : ''}
-              />
-              {isTyping ? 'Editing...' : 'Ready'}
-            </div>
-          </div>
+          <h1 style={{
+            fontSize: '18px',
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
+            color: 'var(--text-primary)',
+            margin: 0
+          }}>
+            MD<span style={{ color: 'var(--crimson-600)' }}>2</span>PDF
+          </h1>
 
           <p style={{
             fontSize: '11px',

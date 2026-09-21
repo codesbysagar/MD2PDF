@@ -18,9 +18,9 @@ export const PAGE_SIZES: Record<string, [number, number]> = {
 };
 
 export const MARGIN_PRESETS = {
-  normal: [40, 40, 40, 40],
-  narrow: [22, 25, 22, 25],
-  wide: [58, 50, 58, 50]
+  normal: [36, 36, 36, 36],
+  narrow: [20, 24, 20, 24],
+  wide: [54, 48, 54, 48]
 };
 
 export interface ProgressCallback {
@@ -61,22 +61,32 @@ async function preprocessHtmlForPdf(
 
   let processedHtml = html;
 
-  // 1. Strip newlines only between block elements so htmlToPdfmake does NOT generate empty paragraphs,
-  // while preserving exact newlines inside <pre><code> blocks and inline spans
+  // 1. Unwrap table wrappers so htmlToPdfmake parses clean, direct <table> elements
   processedHtml = processedHtml.replace(
-    /(<\/(?:h[1-6]|p|blockquote|table|thead|tbody|tr|ul|ol|hr|div|figure|figcaption)>)\s*[\r\n]+\s*(<(?:h[1-6]|p|blockquote|table|thead|tbody|tr|ul|ol|hr|div|figure|figcaption|pre))/gi,
-    '$1$2'
+    /<div class=["']md-table-wrapper["']>\s*(<table[\s\S]*?<\/table>)\s*<\/div>/gi,
+    '$1'
+  );
+
+  // 2. Strip inter-element whitespace between all block & void elements (hr, table, p, h1-h6, etc.)
+  // while strictly preserving indentation and whitespace inside <pre><code> blocks
+  processedHtml = processedHtml.replace(
+    />\s+<(?!\/code)(h[1-6]|p|blockquote|table|thead|tbody|tr|th|td|ul|ol|li|hr|div|pre)/gi,
+    '><$1'
+  );
+  processedHtml = processedHtml.replace(
+    /(<\/(?:h[1-6]|p|blockquote|table|thead|tbody|tr|th|td|ul|ol|li|div|pre)>|<hr\s*\/?>)\s+<(?!\/code)/gi,
+    '$1<'
   );
 
   if (wrapCode) {
     processedHtml = softWrapLongTokens(processedHtml);
   }
 
-  // 2. Pre-process task checkboxes into clean glyphs
+  // 3. Pre-process task checkboxes into clean glyphs
   processedHtml = processedHtml.replace(/<input[^>]*type=["']checkbox["'][^>]*checked[^>]*>/gi, '☑ ');
   processedHtml = processedHtml.replace(/<input[^>]*type=["']checkbox["'][^>]*>/gi, '☐ ');
 
-  // 3. Resolve images
+  // 4. Resolve images
   onProgress?.('highlighting', 50, 'Resolving images and vector assets...');
   const parser = new DOMParser();
   const doc = parser.parseFromString(processedHtml, 'text/html');
@@ -97,7 +107,7 @@ async function preprocessHtmlForPdf(
         placeholder.style.color = '#57609a';
         placeholder.style.fontSize = '9pt';
         placeholder.style.borderRadius = '4px';
-        placeholder.style.margin = '8px 0';
+        placeholder.style.margin = '6px 0';
         placeholder.textContent = `[Image placeholder: ${alt}]`;
         img.replaceWith(placeholder);
       }
@@ -107,14 +117,38 @@ async function preprocessHtmlForPdf(
   return doc.body.innerHTML;
 }
 
+function normalizeCodeTextInlines(inlines: any[]): any[] {
+  const result: any[] = [];
+  for (let i = 0; i < inlines.length; i++) {
+    const curr = inlines[i];
+    if (curr && typeof curr === 'object' && curr.text === '\n') {
+      if (result.length > 0) {
+        const prev = result[result.length - 1];
+        if (typeof prev.text === 'string') {
+          prev.text += '\n';
+        } else {
+          result.push(curr);
+        }
+      } else {
+        result.push(curr);
+      }
+    } else {
+      result.push(curr);
+    }
+  }
+  return result;
+}
+
 /**
  * Transforms parsed AST into clean, web-markdown-matching PDF elements:
- * - Blockquotes with a left border and gray background
- * - Code blocks with rounded-box borders, padding, and background
- * - Cleaner, tighter vertical margins without ghost paragraphs
- * - Tables with repeated headers and proper borders
+ * - Blockquotes with clean callout border, tight padding, and zero ghost lines
+ * - Code blocks with rounded box borders and compact line height
+ * - Horizontal rules as crisp vector canvas lines without phantom table text
+ * - Tables spanning full printable width with proportional columns
+ * - Tight, non-additive vertical spacing that mirrors CSS margin collapsing
+ * - Orphan prevention keeping headings and intro sentences together with content
  */
-function postProcessPdfMakeAst(ast: any[], wrapCode: boolean): any[] {
+function postProcessPdfMakeAst(ast: any[], wrapCode: boolean, printableWidth: number): any[] {
   function transformNode(node: any): any {
     if (!node || typeof node !== 'object') return node;
 
@@ -151,44 +185,54 @@ function postProcessPdfMakeAst(ast: any[], wrapCode: boolean): any[] {
       delete node.marginBottom;
 
       if (level === 1) {
-        node.fontSize = 18;
+        node.fontSize = 17;
         node.bold = true;
         node.color = '#1f2328';
-        node.margin = [0, 10, 0, 6];
+        node.margin = [0, 0, 0, 5];
       } else if (level === 2) {
-        node.fontSize = 14;
+        node.fontSize = 13;
         node.bold = true;
         node.color = '#1f2328';
-        node.margin = [0, 10, 0, 4];
+        node.margin = [0, 9, 0, 3];
       } else if (level === 3) {
-        node.fontSize = 12;
+        node.fontSize = 11;
         node.bold = true;
         node.color = '#1f2328';
-        node.margin = [0, 8, 0, 3];
+        node.margin = [0, 7, 0, 3];
       } else {
-        node.fontSize = 10.5;
+        node.fontSize = 10;
         node.bold = true;
         node.color = '#1f2328';
-        node.margin = [0, 6, 0, 2];
+        node.margin = [0, 5, 0, 2];
       }
       return node;
     }
 
-    // 4. BLOCKQUOTE: Match web markdown with left border and light gray background
+    // 4. BLOCKQUOTE: Match web markdown with left border, light gray background, and zero ghost lines
     if (node.nodeName === 'BLOCKQUOTE') {
-      const children = Array.isArray(node.stack) ? node.stack : [node];
-      const cleanedChildren = children.map((child: any) => {
+      const rawChildren = Array.isArray(node.stack) ? node.stack : [node];
+      // Filter out empty whitespace nodes that htmlToPdfMake injects around blockquotes
+      const filteredChildren = rawChildren.filter((c: any) => {
+        if (!c) return false;
+        if (typeof c.text === 'string' && c.text.trim() === '') return false;
+        return true;
+      });
+
+      const cleanedChildren = filteredChildren.map((child: any) => {
         if (child && child.text && Array.isArray(child.text)) {
           for (const item of child.text) {
             if (item && typeof item === 'object') {
               delete item.margin;
+              delete item.marginBottom;
               if (!item.color) item.color = '#57606a';
             }
           }
         }
         if (child && typeof child === 'object') {
-          child.margin = [0, 0, 0, 3];
+          child.margin = [0, 0, 0, 2];
+          delete child.marginBottom;
           if (!child.color) child.color = '#57606a';
+          child.lineHeight = 1.35;
         }
         return child;
       });
@@ -206,44 +250,22 @@ function postProcessPdfMakeAst(ast: any[], wrapCode: boolean): any[] {
         },
         layout: {
           hLineWidth: () => 0,
-          vLineWidth: (i: number) => (i === 0 ? 3.5 : 0),
+          vLineWidth: (i: number) => (i === 0 ? 3 : 0),
           vLineColor: () => '#d0d7de',
-          paddingLeft: () => 12,
+          paddingLeft: () => 10,
           paddingRight: () => 8,
-          paddingTop: () => 6,
-          paddingBottom: () => 6
+          paddingTop: () => 4,
+          paddingBottom: () => 4
         },
-        margin: [0, 4, 0, 8]
+        margin: [0, 2, 0, 5]
       };
     }
-
-function normalizeCodeTextInlines(inlines: any[]): any[] {
-  const result: any[] = [];
-  for (let i = 0; i < inlines.length; i++) {
-    const curr = inlines[i];
-    if (curr && typeof curr === 'object' && curr.text === '\n') {
-      if (result.length > 0) {
-        const prev = result[result.length - 1];
-        if (typeof prev.text === 'string') {
-          prev.text += '\n';
-        } else {
-          result.push(curr);
-        }
-      } else {
-        result.push(curr);
-      }
-    } else {
-      result.push(curr);
-    }
-  }
-  return result;
-}
 
     // 5. Code block PRE: Match web markdown with border box, padding, and background
     if (node.nodeName === 'PRE' || (node.style && node.style.includes('html-pre'))) {
       node.preserveLeadingSpaces = true;
       node.fontSize = 8.5;
-      node.lineHeight = 1.35;
+      node.lineHeight = 1.3;
       node.color = '#1f2328';
       node.margin = [0, 0, 0, 0];
       if (wrapCode) {
@@ -253,6 +275,12 @@ function normalizeCodeTextInlines(inlines: any[]): any[] {
       // Normalize line breaks inside code blocks
       if (Array.isArray(node.text)) {
         for (const child of node.text) {
+          if (child && typeof child === 'object') {
+            delete child.margin;
+            delete child.marginBottom;
+            child.fontSize = 8.5;
+            child.lineHeight = 1.3;
+          }
           if (child && Array.isArray(child.text)) {
             child.text = normalizeCodeTextInlines(child.text);
           }
@@ -276,69 +304,71 @@ function normalizeCodeTextInlines(inlines: any[]): any[] {
           vLineWidth: () => 0.5,
           hLineColor: () => '#d0d7de',
           vLineColor: () => '#d0d7de',
-          paddingLeft: () => 10,
-          paddingRight: () => 10,
-          paddingTop: () => 8,
-          paddingBottom: () => 8
+          paddingLeft: () => 8,
+          paddingRight: () => 8,
+          paddingTop: () => 6,
+          paddingBottom: () => 6
         },
-        margin: [0, 4, 0, 8]
+        margin: [0, 2, 0, 5]
       };
     }
 
-    // 6. HR horizontal rule: full width subtle divider line
+    // 6. HR horizontal rule: Clean vector canvas line across printable width
     if (node.nodeName === 'HR') {
       return {
-        table: {
-          widths: ['*'],
-          body: [[
-            {
-              text: '',
-              border: [false, false, false, true]
-            }
-          ]]
-        },
-        layout: {
-          hLineWidth: (i: number) => (i === 1 ? 0.75 : 0),
-          vLineWidth: () => 0,
-          hLineColor: () => '#d8dee4',
-          paddingTop: () => 0,
-          paddingBottom: () => 0
-        },
-        margin: [0, 6, 0, 8]
+        canvas: [
+          {
+            type: 'line',
+            x1: 0,
+            y1: 0,
+            x2: printableWidth,
+            y2: 0,
+            lineWidth: 0.75,
+            lineColor: '#d8dee4'
+          }
+        ],
+        margin: [0, 6, 0, 6]
       };
     }
 
-    // 7. Tables: Clean developer borders, header row repeating, no row slicing
+    // 7. Tables: Clean developer borders, repeated headers, proportional full-width sizing
     if (node.table) {
       node.table.headerRows = 1;
       node.table.dontBreakRows = true;
-      if (!node.table.widths && node.table.body && node.table.body[0]) {
-        node.table.widths = Array(node.table.body[0].length).fill('*');
+      if (node.table.body && node.table.body[0]) {
+        const colCount = node.table.body[0].length;
+        // In documentation tables, earlier columns (methods, paths, flags) are compact 'auto'
+        // and the last column (description) expands to fill the full remaining page width '*'
+        if (colCount >= 3) {
+          node.table.widths = Array(colCount - 1).fill('auto').concat(['*']);
+        } else {
+          node.table.widths = Array(colCount).fill('*');
+        }
       }
-      node.margin = [0, 4, 0, 8];
+      node.margin = [0, 2, 0, 5];
       node.layout = {
         hLineWidth: (i: number, tableNode: any) =>
           i === 0 || i === 1 || i === tableNode.table.body.length ? 0.75 : 0.5,
         vLineWidth: () => 0,
         hLineColor: () => '#d0d7de',
-        paddingLeft: () => 8,
-        paddingRight: () => 8,
-        paddingTop: () => 5,
-        paddingBottom: () => 5
+        paddingLeft: () => 6,
+        paddingRight: () => 6,
+        paddingTop: () => 4,
+        paddingBottom: () => 4
       };
       return node;
     }
 
     // 8. Paragraphs: Set clean web-like bottom margin
     if (node.nodeName === 'P') {
-      node.margin = [0, 0, 0, 6];
-      node.lineHeight = 1.45;
+      node.margin = [0, 0, 0, 4];
+      node.lineHeight = 1.35;
       return node;
     }
 
     // 9. Lists: Tighter spacing
     if (node.nodeName === 'UL' || node.nodeName === 'OL') {
-      node.margin = [0, 2, 0, 6];
+      node.margin = [0, 2, 0, 4];
       delete node.marginBottom;
       return node;
     }
@@ -357,7 +387,29 @@ function normalizeCodeTextInlines(inlines: any[]): any[] {
     return node;
   }
 
-  return ast.map(transformNode).filter(Boolean);
+  const processed = ast.map(transformNode).filter(Boolean);
+
+  // 10. Prevent orphan section intros: if a heading is followed by a short intro paragraph
+  // and then a table, canvas line, or code block, keep the paragraph with next element
+  for (let i = 0; i < processed.length - 1; i++) {
+    const curr = processed[i];
+    const prev = i > 0 ? processed[i - 1] : null;
+    const next = processed[i + 1];
+
+    if (
+      curr &&
+      curr.nodeName === 'P' &&
+      prev &&
+      prev.nodeName &&
+      /^H[1-6]$/i.test(prev.nodeName) &&
+      next &&
+      (next.table || next.canvas || next.nodeName === 'PRE' || (next.stack && next.stack[0]?.nodeName === 'PRE'))
+    ) {
+      curr.keepWithNext = true;
+    }
+  }
+
+  return processed;
 }
 
 export async function generatePdfFromHtml(
@@ -384,7 +436,7 @@ export async function generatePdfFromHtml(
         background: '#f6f8fa',
         color: '#1f2328'
       },
-      p: { margin: [0, 0, 0, 6], lineHeight: 1.45, color: '#24292f' },
+      p: { margin: [0, 0, 0, 4], lineHeight: 1.35, color: '#24292f' },
       th: {
         bold: true,
         fillColor: '#f6f8fa',
@@ -395,9 +447,6 @@ export async function generatePdfFromHtml(
       }
     }
   });
-
-  // Post-process AST for high-fidelity web matching
-  const finalContent = postProcessPdfMakeAst(rawPdfmakeContent, config.wrapCode);
 
   let margins: [number, number, number, number];
   if (config.marginPreset === 'custom') {
@@ -411,14 +460,21 @@ export async function generatePdfFromHtml(
     margins = MARGIN_PRESETS[config.marginPreset] as [number, number, number, number];
   }
 
+  const pageDimensions = PAGE_SIZES[config.pageSize] || PAGE_SIZES.A4;
+  const pageWidth = config.orientation === 'landscape' ? pageDimensions[1] : pageDimensions[0];
+  const printableWidth = Math.max(100, pageWidth - margins[0] - margins[2]);
+
+  // Post-process AST for high-fidelity web matching
+  const finalContent = postProcessPdfMakeAst(rawPdfmakeContent, config.wrapCode, printableWidth);
+
   const docDefinition: any = {
     pageSize: config.pageSize,
     pageOrientation: config.orientation,
-    pageMargins: [margins[0], margins[1], margins[2], config.showPageNumbers ? margins[3] + 15 : margins[3]],
+    pageMargins: [margins[0], margins[1], margins[2], config.showPageNumbers ? margins[3] + 12 : margins[3]],
     content: finalContent,
     defaultStyle: {
-      fontSize: 10,
-      lineHeight: 1.45,
+      fontSize: 9.5,
+      lineHeight: 1.35,
       color: '#24292f'
     }
   };
@@ -442,7 +498,7 @@ export async function generatePdfFromHtml(
             margin: [0, 0, margins[2], 0]
           }
         ],
-        margin: [0, 8, 0, 0]
+        margin: [0, 6, 0, 0]
       };
     };
   }

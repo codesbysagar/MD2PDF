@@ -36,7 +36,7 @@ export function App() {
   }, [theme]);
 
   // Markdown Document State
-  const [sourceFilename, setSourceFilename] = useState<string>('cloudmesh-api-guide.md');
+  const [sourceFilename, setSourceFilename] = useState<string>('welcome-guide.md');
   const [markdown, setMarkdown] = useState<string>(SAMPLE_TEMPLATES[0].content);
   const [renderedHtml, setRenderedHtml] = useState<string>('');
   const [isTyping, setIsTyping] = useState<boolean>(false);
@@ -56,7 +56,7 @@ export function App() {
     customMargins: { top: 40, right: 40, bottom: 40, left: 40 },
     wrapCode: true,
     showPageNumbers: true,
-    documentTitle: 'CloudMesh API Reference'
+    documentTitle: 'MD2PDF Welcome Guide'
   });
 
   // Generation Engine State
@@ -219,7 +219,6 @@ export function App() {
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
         onSelectSample={handleSelectSample}
         onOpenHelp={() => setIsHelpOpen(true)}
-        isTyping={isTyping}
       />
 
       {/* 2. Progress Bar with Crimson Glow & Shimmer */}

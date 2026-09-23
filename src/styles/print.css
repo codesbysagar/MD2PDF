@@ -50,7 +50,6 @@
 
   .markdown-body pre,
   .markdown-body blockquote,
-  .markdown-body table,
   .markdown-body figure {
     page-break-inside: avoid;
     break-inside: avoid;

@@ -82,9 +82,9 @@ async function preprocessHtmlForPdf(
     processedHtml = softWrapLongTokens(processedHtml);
   }
 
-  // 3. Pre-process task checkboxes into clean glyphs
-  processedHtml = processedHtml.replace(/<input[^>]*type=["']checkbox["'][^>]*checked[^>]*>/gi, '☑ ');
-  processedHtml = processedHtml.replace(/<input[^>]*type=["']checkbox["'][^>]*>/gi, '☐ ');
+  // 3. Pre-process task checkboxes into clean glyphs regardless of attribute ordering
+  processedHtml = processedHtml.replace(/<input(?=[^>]*\btype=["']checkbox["'])(?=[^>]*\bchecked\b)[^>]*>/gi, '☑ ');
+  processedHtml = processedHtml.replace(/<input(?=[^>]*\btype=["']checkbox["'])[^>]*>/gi, '☐ ');
 
   // 4. Resolve images
   onProgress?.('highlighting', 50, 'Resolving images and vector assets...');
@@ -137,6 +137,35 @@ function normalizeCodeTextInlines(inlines: any[]): any[] {
     }
   }
   return result;
+}
+
+function extractCellText(cell: any): string {
+  if (!cell) return '';
+  if (typeof cell === 'string') return cell.trim();
+  if (typeof cell.text === 'string') return cell.text.trim();
+  if (Array.isArray(cell.text)) {
+    return cell.text
+      .map((t: any) => (typeof t === 'string' ? t : (t?.text || '')))
+      .join('')
+      .trim();
+  }
+  if (Array.isArray(cell.stack)) {
+    return cell.stack.map(extractCellText).join(' ').trim();
+  }
+  return '';
+}
+
+function getColMaxCharLength(body: any[][], colIdx: number): number {
+  let maxLen = 0;
+  const sampleRows = Math.min(body.length, 12);
+  for (let r = 0; r < sampleRows; r++) {
+    const cell = body[r]?.[colIdx];
+    const text = extractCellText(cell);
+    if (text.length > maxLen) {
+      maxLen = text.length;
+    }
+  }
+  return maxLen;
 }
 
 /**
@@ -337,12 +366,33 @@ function postProcessPdfMakeAst(ast: any[], wrapCode: boolean, printableWidth: nu
       node.table.dontBreakRows = true;
       if (node.table.body && node.table.body[0]) {
         const colCount = node.table.body[0].length;
-        // In documentation tables, earlier columns (methods, paths, flags) are compact 'auto'
-        // and the last column (description) expands to fill the full remaining page width '*'
-        if (colCount >= 3) {
-          node.table.widths = Array(colCount - 1).fill('auto').concat(['*']);
+        if (colCount === 1) {
+          node.table.widths = ['*'];
+        } else if (colCount === 2) {
+          const col0Len = getColMaxCharLength(node.table.body, 0);
+          node.table.widths = col0Len <= 25 ? ['auto', '*'] : ['*', '*'];
+        } else if (colCount === 3) {
+          const col0Len = getColMaxCharLength(node.table.body, 0);
+          const col1Len = getColMaxCharLength(node.table.body, 1);
+          const w0 = col0Len <= 15 ? 'auto' : '*';
+          const w1 = col1Len <= 20 ? 'auto' : '*';
+          node.table.widths = [w0, w1, '*'];
         } else {
-          node.table.widths = Array(colCount).fill('*');
+          // 4+ columns (e.g. cheatsheet, comparison, matrix)
+          // Keep compact index columns (e.g. #, ID, No) as 'auto' and distribute content columns with '*'
+          const widths: string[] = [];
+          for (let colIdx = 0; colIdx < colCount; colIdx++) {
+            const maxLen = getColMaxCharLength(node.table.body, colIdx);
+            if (maxLen <= 5 && colIdx === 0) {
+              widths.push('auto');
+            } else {
+              widths.push('*');
+            }
+          }
+          if (!widths.includes('*')) {
+            widths[widths.length - 1] = '*';
+          }
+          node.table.widths = widths;
         }
       }
       node.margin = [0, 2, 0, 5];
@@ -440,10 +490,12 @@ export async function generatePdfFromHtml(
       th: {
         bold: true,
         fillColor: '#f6f8fa',
-        color: '#1f2328'
+        color: '#1f2328',
+        fontSize: 9
       },
       td: {
-        color: '#24292f'
+        color: '#24292f',
+        fontSize: 8.5
       }
     }
   });

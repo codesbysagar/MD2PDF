@@ -62,35 +62,28 @@ renderer.image = function ({ href, title, text }: { href: string; title?: string
   return `<figure class="md-figure"><img src="${safeHref}" alt="${safeAlt}"${safeTitle} class="md-image" loading="lazy" onerror="this.onerror=null;this.classList.add('md-img-failed');this.alt='[Image failed to load: '+this.alt+']';" /><figcaption class="md-figcaption">${safeAlt}</figcaption></figure>`;
 };
 
-// Custom table renderer to ensure wrapper for responsive scroll in HTML preview
-renderer.table = function (token: any) {
-  let headerHtml = '';
-  if (token.header) {
-    const headerCells = token.header
-      .map((cell: any) => `<th>${cell.text}</th>`)
-      .join('');
-    headerHtml = `<tr>${headerCells}</tr>`;
-  }
-
-  let bodyHtml = '';
-  if (token.rows) {
-    bodyHtml = token.rows
-      .map((row: any) => {
-        const cells = row.map((cell: any) => `<td>${cell.text}</td>`).join('');
-        return `<tr>${cells}</tr>`;
-      })
-      .join('');
-  }
-
-  return `<div class="md-table-wrapper"><table class="md-table"><thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody></table></div>`;
+// Custom table cell renderer: parse inline tokens (bold, italics, code, links, math, <br>, etc.)
+// and preserve column alignment using both align attribute and inline style for HTML & pdfmake
+renderer.tablecell = function (this: any, token: any) {
+  const content = this.parser.parseInline(token.tokens);
+  const tag = token.header ? 'th' : 'td';
+  const alignAttr = token.align ? ` align="${token.align}" style="text-align: ${token.align};"` : '';
+  return `<${tag}${alignAttr}>${content}</${tag}>\n`;
 };
 
-// Task list items
-renderer.listitem = function (item: any) {
+// Custom table renderer: use marked's built-in table layout while wrapping in responsive container
+renderer.table = function (this: any, token: any) {
+  const tableHtml = marked.Renderer.prototype.table.call(this, token);
+  return `<div class="md-table-wrapper">${tableHtml.replace('<table', '<table class="md-table"')}</div>`;
+};
+
+// Custom list item renderer: parse inline tokens for full markdown compatibility in lists
+renderer.listitem = function (this: any, item: any) {
+  const content = this.parser.parse(item.tokens);
   if (item.task) {
-    return `<li class="md-task-list-item"><input type="checkbox" disabled ${item.checked ? 'checked' : ''} class="md-checkbox" /> ${item.text}</li>`;
+    return `<li class="md-task-list-item">${content}</li>\n`;
   }
-  return `<li>${item.text}</li>`;
+  return `<li>${content}</li>\n`;
 };
 
 marked.use({
